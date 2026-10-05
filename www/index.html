@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>SKY RAW – Application fonctionnelle</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .video-wrapper { position: relative; width: 100%; max-width: 640px; margin: 0 auto; }
+        video { width: 100%; background: #000; }
+        .controls { background: rgba(15,23,42,0.8); backdrop-filter: blur(4px); border: 1px solid rgba(148,163,184,0.2); }
+    </style>
+</head>
+<body class="bg-gradient-dark text-gray-100 min-h-screen flex flex-col p-4">
+    <header class="text-center mb-4">
+        <h1 class="text-2xl font-bold text-gradient">SKY RAW</h1>
+        <p class="mt-1 text-sm text-gray-400">Application fonctionnelle – caméra, réglages RAW, capture</p>
+    </header>
+
+    <main class="flex-1 overflow-y-auto space-y-4">
+        <!-- Vidéo -->
+        <section class="video-wrapper">
+            <video id="video" autoplay playsinline></video>
+        </section>
+
+        <!-- Controls -->
+        <section class="card-bg rounded-xl p-4 controls">
+            <div class="space-y-3">
+                <!-- Compression -->
+                <div class="flex items-center justify-between text-sm">
+                    <span>Compression (ratio):</span>
+                    <span id="compValue">1:1</span>
+                </div>
+                <input type="range" min="1" max="20" value="1" id="compSlider" class="w-full">
+
+                <!-- Profondeur -->
+                <div class="flex items-center gap-2 text-sm">
+                    <span>Profondeur:</span>
+                    <div class="flex space-x-2">
+                        <label class="flex items-center">
+                            <input type="radio" name="depth" value="10" id="depth10">
+                            10‑bit
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="depth" value="12" id="depth12">
+                            12‑bit
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="depth" value="14" id="depth14">
+                            14‑bit
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="depth" value="16" id="depth16">
+                            16‑bit
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Boutons -->
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <button id="startBtn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded">Démarrer la caméra</button>
+                    <button id="captureBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded" disabled>Capturer</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Captures -->
+        <section class="card-bg rounded-xl p-4 controls">
+            <h2 class="text-lg font-semibold mb-2">Captures</h2>
+            <div id="gallery" class="grid gap-2 sm:grid-cols-2"></div>
+        </section>
+    </main>
+
+    <footer class="text-center text-xs text-gray-500 mt-4">
+        SKY RAW – Demo fonctionnelle. Les réglages sont sauvegardés dans le navigateur.
+    </footer>
+
+    <script>
+        const video = document.getElementById('video');
+        const startBtn = document.getElementById('startBtn');
+        const captureBtn = document.getElementById('captureBtn');
+        const compSlider = document.getElementById('compSlider');
+        const compValue = document.getElementById('compValue');
+        const depthOpts = document.querySelectorAll('input[name="depth"]');
+        const gallery = document.getElementById('gallery');
+
+        let stream = null;
+
+        // Charger réglages depuis localStorage
+        const loadSettings = () => {
+            const savedComp = localStorage.getItem('skyrawComp');
+            if (savedComp !== null) {
+                compSlider.value = savedComp;
+                compValue.textContent = `${savedComp}:1`;
+            }
+            const savedDepth = localStorage.getItem('skyrawDepth');
+            if (savedDepth !== null) {
+                const rad = document.querySelector(`input[name="depth"][value="${savedDepth}"]`);
+                if (rad) rad.checked = true;
+            }
+        };
+        const saveSettings = () => {
+            localStorage.setItem('skyrawComp', compSlider.value);
+            const depthChecked = document.querySelector('input[name="depth"]:checked');
+            if (depthChecked) localStorage.setItem('skyrawDepth', depthChecked.value);
+        };
+
+        // Démarrer caméra
+        startBtn.addEventListener('click', async () => {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                video.srcObject = stream;
+                startBtn.disabled = true;
+                captureBtn.disabled = false;
+            } catch (err) {
+                alert("Impossible d'accéder à la caméra : " + err);
+            }
+        });
+
+        // Mettre à jour affichage compression
+        compSlider.addEventListener('input', () => {
+            const val = compSlider.value;
+            compValue.textContent = `${val}:1`;
+            saveSettings();
+        });
+
+        // Sauvegarder profondeur
+        depthOpts.forEach(opt => {
+            opt.addEventListener('change', () => {
+                if (opt.checked) saveSettings();
+            });
+        });
+
+        // Capturer frame
+        captureBtn.addEventListener('click', () => {
+            if (!stream) return;
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const comp = compSlider.value;
+                const depth = document.querySelector('input[name="depth"]:checked').value;
+                a.href = url;
+                a.download = `skyraw_${comp}:1_${depth}bit_${timestamp}.png`;
+                a.click();
+                URL.revokeObjectURL(url);
+
+                // Ajouter à la galerie
+                const img = document.createElement('img');
+                img.src = url;
+                img.classList.add('rounded', 'shadow', 'w-full', 'h-auto');
+                const div = document.createElement('div');
+                div.appendChild(img);
+                gallery.prepend(div);
+            }, 'image/png');
+        });
+
+        // Nettoyer
+        window.addEventListener('beforeunload', () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+        });
+
+        // Initialiser
+        loadSettings();
+    </script>
+</body>
+</html>

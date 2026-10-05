@@ -1,0 +1,22 @@
+name: "Vibastic Builds"
+run-name: "Vibastic ${{ github.event.inputs.client_build_id }}"
+on:
+  workflow_dispatch:
+    inputs:
+      client_build_id: { required: true, type: string }
+      retry_count: { required: false, type: string, default: "0" }
+permissions: { contents: read }
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure PWA manifest
+        run: |
+          test -f www/index.html
+          test -f www/manifest.json || echo '{"name":"App","start_url":".","display":"standalone"}' > www/manifest.json
+      - name: Zip web app
+        run: (cd www && zip -r ../web-pwa.zip .)
+      - uses: actions/upload-artifact@v4
+        with: { name: web-pwa, retention-days: 7, path: "web-pwa.zip" }

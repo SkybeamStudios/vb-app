@@ -1,0 +1,33 @@
+name: "Vibastic Builds"
+run-name: "Vibastic ${{ github.event.inputs.client_build_id }}"
+on:
+  workflow_dispatch:
+    inputs:
+      client_build_id: { required: true, type: string }
+      retry_count: { required: false, type: string, default: "0" }
+permissions: { contents: read }
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - name: Capacitor iOS shell around www/
+        run: |
+          npm init -y >/dev/null
+          npm install @capacitor/core @capacitor/cli @capacitor/ios --no-audit --no-fund
+          npx cap add ios
+          npx cap sync ios
+      - name: Install app icon (official Vibastic AppIcon)
+        run: bash ios-install-icons.sh
+      - name: Build unsigned IPA (CODE_SIGNING_ALLOWED=NO)
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -sdk iphoneos CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" -derivedDataPath dd build
+          mkdir -p Payload
+          cp -r dd/Build/Products/Release-iphoneos/App.app Payload/
+          zip -qry App-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with: { name: ios-unsigned, retention-days: 7, path: "App-unsigned.ipa" }

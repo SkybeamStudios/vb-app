@@ -1,0 +1,25 @@
+name: "Vibastic Builds"
+run-name: "Vibastic ${{ github.event.inputs.client_build_id }}"
+on:
+  workflow_dispatch:
+    inputs:
+      client_build_id: { required: true, type: string }
+      retry_count: { required: false, type: string, default: "0" }
+permissions: { contents: read }
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build live ISO (live-build + xorriso, kiosk Chromium)
+        run: |
+          sudo apt-get update && sudo apt-get install -y live-build xorriso squashfs-tools
+          mkdir -p live && cd live && lb config \
+            --distribution bookworm --archive-areas "main contrib non-free" \
+            --packages "chromium openbox xorg nginx" \
+            --bootappend-live "boot=live components quiet"
+          sudo lb build 2>&1 | tail -50
+          ls -la *.iso
+      - uses: actions/upload-artifact@v4
+        with: { name: live-iso, retention-days: 7, path: "live/*.iso" }

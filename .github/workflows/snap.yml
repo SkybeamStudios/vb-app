@@ -1,0 +1,48 @@
+name: "Vibastic Builds"
+run-name: "Vibastic ${{ github.event.inputs.client_build_id }}"
+on:
+  workflow_dispatch:
+    inputs:
+      client_build_id: { required: true, type: string }
+      retry_count: { required: false, type: string, default: "0" }
+permissions: { contents: read }
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install app icon (official Vibastic icon)
+        run: bash install-electron-icon.sh
+      - name: Build Electron app (unpacked)
+        working-directory: electron
+        run: |
+          npm install
+          npx electron-builder --linux dir --publish never
+      - name: Prepare Electron app for snapcraft
+        run: |
+          mkdir -p snap/gui app
+          cp -r electron/app/* app/
+          cp electron/build/icon.png snap/gui/icon.png
+          cat > snap/snapcraft.yaml <<'YAML'
+          name: vibastic-app
+          base: core22
+          version: "1.0.0"
+          summary: Vibastic app
+          description: App generated with Vibastic
+          confinement: strict
+          grade: stable
+          icon: snap/gui/icon.png
+          apps:
+            vibastic-app:
+              command: electron-launch
+              plugs: [browser-support, network]
+          parts:
+            app:
+              plugin: dump
+              source: electron/dist/linux-unpacked
+          YAML
+      - uses: snapcore/action-build@v1
+        id: snap
+      - uses: actions/upload-artifact@v4
+        with: { name: snap, retention-days: 7, path: "${{ steps.snap.outputs.snap }}" }

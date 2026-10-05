@@ -1,0 +1,29 @@
+name: "Vibastic Builds"
+run-name: "Vibastic ${{ github.event.inputs.client_build_id }}"
+on:
+  workflow_dispatch:
+    inputs:
+      client_build_id: { required: true, type: string }
+      retry_count: { required: false, type: string, default: "0" }
+permissions: { contents: read }
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - name: Install flatpak toolchain
+        run: |
+          sudo apt-get update && sudo apt-get install -y flatpak flatpak-builder
+          flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo --user
+      - name: Install app icon (official Vibastic icon)
+        run: bash install-electron-icon.sh
+      - name: Build Flatpak (electron-builder)
+        working-directory: electron
+        run: |
+          npm install
+          npx electron-builder --linux flatpak --publish never
+      - uses: actions/upload-artifact@v4
+        with: { name: flatpak, retention-days: 7, path: "electron/dist/*.flatpak" }

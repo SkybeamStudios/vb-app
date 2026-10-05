@@ -1,0 +1,45 @@
+name: "Vibastic Builds"
+run-name: "Vibastic ${{ github.event.inputs.client_build_id }}"
+on:
+  workflow_dispatch:
+    inputs:
+      client_build_id: { required: true, type: string }
+      retry_count: { required: false, type: string, default: "0" }
+      target: { required: true, type: string, default: "adhoc" }
+      runner_token: { required: true, type: string }
+      vibastic_origin: { required: true, type: string }
+permissions: { contents: read }
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - uses: ruby/setup-ruby@v1
+        with: { ruby-version: "3.2" }
+      - name: Capacitor iOS shell
+        run: |
+          npm init -y >/dev/null
+          npm install @capacitor/core @capacitor/cli @capacitor/ios --no-audit --no-fund
+          npx cap add ios
+          npx cap sync ios
+      - name: Install app icon (official Vibastic AppIcon)
+        run: bash ios-install-icons.sh
+      - name: Install fastlane
+        run: gem install fastlane --no-document
+      - name: Fetch App Store Connect key (single-use, 10 min TTL, never logged)
+        run: |
+          curl -sS -H "x-runner-token: ${{ github.event.inputs.runner_token }}" \
+            "${{ github.event.inputs.vibastic_origin }}/api/apple/key" -o asc_key.json
+          test -s asc_key.json
+      - name: Fastlane (match + sign + deliver)
+        env:
+          TARGET: ${{ github.event.inputs.target }}
+        run: |
+          cp Fastfile ios/fastlane/Fastfile 2>/dev/null || (mkdir -p ios/fastlane && cp Fastfile ios/fastlane/Fastfile)
+          cd ios && fastlane "${TARGET}" --verbose
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: ios-signed, retention-days: 7, path: "ios/*.ipa" }
