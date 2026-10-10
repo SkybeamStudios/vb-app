@@ -1,37 +1,20 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>What I can do</title>
+<title>Vibastic Windows 11 App</title>
 <style>
-  body {
-    margin: 0;
-    min-height: 100vh;
-    background: linear-gradient(135deg, #1a2a63, #b21f1f, #1a2a63);
-    color: #fff;
-    font-family: system-ui, sans-serif;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 1rem;
-  }
-  .container {
-    max-width: 400px;
-    background: rgba(0,0,0,0.4);
-    padding: 2rem;
-    border-radius: 12px;
-    backdrop-filter: blur(4px);
-  }
-  h1 { margin-top: 0; }
+  body { margin:0; font-family:system-ui, sans-serif; background:linear-gradient(135deg,#1e293b,#0f172a); color:#e2e8f0; height:100vh; display:flex; align-items:center; justify-content:center; }
+  button { background:#3b82f6; color:#fff; border:none; padding:1rem 2rem; border-radius:0.5rem; font-size:1.2rem; cursor:pointer; transition:background .2s; }
+  button:hover { background:#2563eb; }
 </style>
 </head>
 <body>
-<div class="container">
-  <h1>What I can do</h1>
-  <p>I can generate complete, working web apps from your description, instantly.</p>
-  <p>Just tell me what you want — a counter, todo list, timer, or any simple tool — and I’ll output the full HTML, CSS, and JavaScript ready to run.</p>
-  <p>I handle persistence with localStorage, responsive design, dark mode, and polished interactions.</p>
-</div>
+<button id="actionBtn">Cliquez-moi</button>
+<script>
+  document.getElementById('actionBtn').addEventListener('click', () => {
+    alert('Bonjour depuis votre application Windows 11 !');
+  });
+</script>
 </body>
 </html>

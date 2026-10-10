@@ -1,0 +1,16 @@
+{
+  "name": "vibastic-app",
+  "version": "1.0.0",
+  "main": "main.js",
+  "scripts": { "build": "electron-builder" },
+  "devDependencies": { "electron": "^31.0.0", "electron-builder": "^24.13.3" },
+  "build": {
+    "appId": "online.vibastic.userapp",
+    "productName": "app",
+    "directories": { "output": "dist" },
+    "files": ["main.js", "app/**/*"],
+    "linux": { "target": ["AppImage", "deb", "rpm", "flatpak"], "category": "Utility" },
+    "mac": { "target": ["dmg"], "identity": null },
+    "win": { "target": ["nsis", "msi"] }
+  }
+}

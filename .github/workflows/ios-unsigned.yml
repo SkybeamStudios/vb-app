@@ -13,13 +13,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        with: { node-version: "22" }
       - name: Capacitor iOS shell around www/
         run: |
-          npm init -y >/dev/null
-          npm install @capacitor/core @capacitor/cli @capacitor/ios --no-audit --no-fund
-          npx cap add ios
-          npx cap sync ios
+          node -e "let c=null;try{c=require('./capacitor.config.json')}catch(e){};if(!c||!c.appId){console.error('INVALID_CONFIG: capacitor.config.json or appId missing in the build repo — iosShell() was not pushed');process.exit(1)};console.log('appId='+c.appId+' appName='+(c.appName||''))"
+          npm install @capacitor/ios --no-audit --no-fund
+          CAPV=$(node -p "require('./node_modules/@capacitor/ios/package.json').version")
+          npm install @capacitor/core@$CAPV @capacitor/cli@$CAPV --no-audit --no-fund
+          CAP=./node_modules/.bin/cap
+          echo "capacitor=$CAPV cli=$(node -p "require('./node_modules/@capacitor/cli/package.json').version") bin=$($CAP --version 2>&1 | tail -1) pod=$(pod --version 2>/dev/null || echo none)"
+          ADD_RC=0
+          $CAP add ios || ADD_RC=$?
+          echo "cap_add_rc=$ADD_RC"
+          ls ios/App 2>/dev/null || true
+          if [ "$ADD_RC" -ne 0 ]; then
+            [ -f ios/App/Podfile ] && { echo "--- Podfile (first 6 lines)"; sed -n '1,6p' ios/App/Podfile; } || true
+            [ -d ios/App/CapApp-SPM ] && echo "CapApp-SPM present" || echo "CapApp-SPM ABSENT"
+            exit $ADD_RC
+          fi
+          LAYOUT=none
+          [ -d ios/App/CapApp-SPM ] && LAYOUT=spm || true
+          [ -f ios/App/Podfile ] && LAYOUT=cocoapods || true
+          MIN=$(grep -oE "deployment_target = '[0-9.]+'" node_modules/@capacitor/ios/Capacitor.podspec | grep -oE "[0-9]+[.][0-9]+" | head -1)
+          echo "layout=$LAYOUT required-ios=$MIN"
+          if [ -f ios/App/Podfile ]; then
+            echo "podfile-before=$(grep -m1 -E '^platform' ios/App/Podfile)"
+            sed -E -i.bak "s/^platform :ios, '[0-9.]*'/platform :ios, '$MIN'/" ios/App/Podfile && rm -f ios/App/Podfile.bak
+            echo "podfile-after=$(grep -m1 -E '^platform' ios/App/Podfile)"
+          fi
+          sed -E -i.bak "s/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]+/IPHONEOS_DEPLOYMENT_TARGET = $MIN/g" ios/App/App.xcodeproj/project.pbxproj && rm -f ios/App/App.xcodeproj/project.pbxproj.bak
+          $CAP sync ios
       - name: Install app icon (official Vibastic AppIcon)
         run: bash ios-install-icons.sh
       - name: Build unsigned IPA (CODE_SIGNING_ALLOWED=NO)
